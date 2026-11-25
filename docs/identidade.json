@@ -1,0 +1,13 @@
+{
+  "nome": "Breather",
+  "paleta": {
+    "fundo": "#0B2B2E",
+    "primaria": "#5EEAD4",
+    "secundaria": "#14B8A6",
+    "texto": "#F1F5F0",
+    "acento": "#FB7185"
+  },
+  "fonte": "Nunito, 'Segoe UI', system-ui, sans-serif",
+  "logo": "docs/logo.svg",
+  "conceito": "Respiração calma: quando a API pede pausa, todas as threads respiram juntas."
+}

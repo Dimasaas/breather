@@ -2,9 +2,9 @@
 
 <p align="center">
   <a href="https://github.com/Dimasaas/breather/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Dimasaas/breather/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="licença" src="https://img.shields.io/badge/licen%C3%A7a-PolyForm%20Noncommercial-FF4FA3">
-  <img alt="Ruby" src="https://img.shields.io/badge/ruby-%E2%89%A5%203.2-CC342D?logo=ruby&logoColor=white">
-  <img alt="dependências" src="https://img.shields.io/badge/depend%C3%AAncias-zero-00B8D4">
+  <img alt="licença" src="https://img.shields.io/badge/licen%C3%A7a-PolyForm%20Noncommercial-14B8A6">
+  <img alt="Ruby" src="https://img.shields.io/badge/ruby-%E2%89%A5%203.2-0B2B2E?logo=ruby&logoColor=white">
+  <img alt="dependências" src="https://img.shields.io/badge/depend%C3%AAncias-zero-5EEAD4">
 </p>
 
 # Breather
