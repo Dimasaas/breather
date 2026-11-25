@@ -10,7 +10,7 @@ Gem::Specification.new do |s|
   s.description   = "No primeiro 503 todas as threads que compartilham o freio pausam, com " \
                     "backoff exponencial, teto e jitter. Só operações idempotentes são refeitas."
   s.homepage      = "https://github.com/Dimasaas/freio"
-  s.license       = "MIT"
+  s.license       = "PolyForm-Noncommercial-1.0.0"
   s.required_ruby_version = ">= 3.2"
   s.files         = Dir["lib/**/*.rb", "LICENSE", "README.md"]
   s.require_paths = ["lib"]
