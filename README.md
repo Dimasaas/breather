@@ -1,7 +1,7 @@
 <p align="center"><img src="docs/banner.svg" alt="Breather: freio global cooperativo para APIs que devolvem 503" width="100%"></p>
 
 <p align="center">
-  <a href="https://github.com/Dimasaas/freio/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Dimasaas/freio/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/Dimasaas/breather/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Dimasaas/breather/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="licença" src="https://img.shields.io/badge/licen%C3%A7a-PolyForm%20Noncommercial-7C4DFF">
   <img alt="Ruby" src="https://img.shields.io/badge/ruby-%E2%89%A5%203.2-CC342D?logo=ruby&logoColor=white">
   <img alt="dependências" src="https://img.shields.io/badge/depend%C3%AAncias-zero-00B8D4">
