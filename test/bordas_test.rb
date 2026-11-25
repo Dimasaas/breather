@@ -10,16 +10,16 @@ class BordasTest < Minitest::Test
 
   def novo(**opcoes)
     padrao = { base: 1, teto: 5, fator: 10, jitter: 0, relogio: @rel.relogio, dormir: @rel.sono }
-    Respiro.new(**padrao, **opcoes)
+    Breather.new(**padrao, **opcoes)
   end
 
   # --- teto ---------------------------------------------------------------
 
   def test_teto_limita_o_backoff
-    respiro = novo
+    breather = novo
     duracoes = 4.times.map do
-      d = respiro.acionar!
-      respiro.aguardar!
+      d = breather.acionar!
+      breather.aguardar!
       d
     end
     assert_equal [1.0, 5.0, 5.0, 5.0], duracoes
@@ -30,91 +30,91 @@ class BordasTest < Minitest::Test
   end
 
   def test_teto_vale_depois_do_jitter
-    respiro = novo(base: 4, teto: 5, jitter: 1.0, sorteio: -> { 1.0 })
-    assert_in_delta 5.0, respiro.acionar!, 1e-9
+    breather = novo(base: 4, teto: 5, jitter: 1.0, sorteio: -> { 1.0 })
+    assert_in_delta 5.0, breather.acionar!, 1e-9
   end
 
   def test_fator_um_mantem_a_pausa_constante
-    respiro = novo(fator: 1, teto: 50)
-    assert_equal [1.0, 1.0, 1.0], 3.times.map { respiro.acionar!.tap { respiro.aguardar! } }
+    breather = novo(fator: 1, teto: 50)
+    assert_equal [1.0, 1.0, 1.0], 3.times.map { breather.acionar!.tap { breather.aguardar! } }
   end
 
   # --- jitter -------------------------------------------------------------
 
   def test_jitter_soma_fracao_sorteada
-    respiro = novo(base: 10, teto: 100, jitter: 0.2, sorteio: -> { 0.5 })
-    assert_in_delta 11.0, respiro.acionar!, 1e-9
+    breather = novo(base: 10, teto: 100, jitter: 0.2, sorteio: -> { 0.5 })
+    assert_in_delta 11.0, breather.acionar!, 1e-9
   end
 
   def test_jitter_zero_e_deterministico
-    respiro = novo(base: 10, teto: 100, jitter: 0, sorteio: -> { 0.99 })
-    assert_in_delta 10.0, respiro.acionar!, 1e-9
+    breather = novo(base: 10, teto: 100, jitter: 0, sorteio: -> { 0.99 })
+    assert_in_delta 10.0, breather.acionar!, 1e-9
   end
 
   def test_jitter_fica_na_faixa_com_sorteio_real
     200.times do
-      respiro = novo(base: 10, teto: 100, jitter: 0.3)
-      d = respiro.acionar!
+      breather = novo(base: 10, teto: 100, jitter: 0.3)
+      d = breather.acionar!
       assert_operator d, :>=, 10.0
       assert_operator d, :<=, 13.0
     end
   end
 
   def test_jitter_aplica_sobre_o_backoff_ja_escalado
-    respiro = novo(base: 2, teto: 100, fator: 2, jitter: 0.5, sorteio: -> { 1.0 })
-    assert_in_delta 3.0, respiro.acionar!, 1e-9
-    respiro.aguardar!
-    assert_in_delta 6.0, respiro.acionar!, 1e-9
+    breather = novo(base: 2, teto: 100, fator: 2, jitter: 0.5, sorteio: -> { 1.0 })
+    assert_in_delta 3.0, breather.acionar!, 1e-9
+    breather.aguardar!
+    assert_in_delta 6.0, breather.acionar!, 1e-9
   end
 
   # --- operacao nao idempotente -------------------------------------------
 
   def test_escrita_nunca_e_refeita
-    respiro = novo
+    breather = novo
     chamadas = 0
-    erro = assert_raises(Respiro::Indisponivel) do
-      Respiro.executar(respiro, idempotente: false) do
+    erro = assert_raises(Breather::Indisponivel) do
+      Breather.executar(breather, idempotente: false) do
         chamadas += 1
-        raise Respiro::Indisponivel, "503"
+        raise Breather::Indisponivel, "503"
       end
     end
     assert_equal 1, chamadas
-    refute_kind_of Respiro::TentativasEsgotadas, erro
+    refute_kind_of Breather::TentativasEsgotadas, erro
   end
 
   def test_idempotente_e_o_padrao_seguro_falso
     chamadas = 0
-    assert_raises(Respiro::Indisponivel) do
-      Respiro.executar(novo) do
+    assert_raises(Breather::Indisponivel) do
+      Breather.executar(novo) do
         chamadas += 1
-        raise Respiro::Indisponivel
+        raise Breather::Indisponivel
       end
     end
     assert_equal 1, chamadas, "sem declarar idempotente, não há retentativa"
   end
 
-  def test_escrita_que_falha_aciona_o_respiro_para_as_outras_threads
-    respiro = novo
-    assert_raises(Respiro::Indisponivel) do
-      Respiro.executar(respiro, idempotente: false) { raise Respiro::Indisponivel }
+  def test_escrita_que_falha_aciona_o_breather_para_as_outras_threads
+    breather = novo
+    assert_raises(Breather::Indisponivel) do
+      Breather.executar(breather, idempotente: false) { raise Breather::Indisponivel }
     end
-    assert respiro.pausado?, "a leitura que vier depois espera"
+    assert breather.pausado?, "a leitura que vier depois espera"
   end
 
   def test_escrita_tambem_espera_a_pausa_antes_de_enviar
-    respiro = novo
-    respiro.acionar!
+    breather = novo
+    breather.acionar!
     enviado_em = nil
-    Respiro.executar(respiro, idempotente: false) { enviado_em = @rel.agora }
+    Breather.executar(breather, idempotente: false) { enviado_em = @rel.agora }
     assert_in_delta 1.0, enviado_em, 1e-9
   end
 
   def test_escrita_bem_sucedida_zera_o_backoff
-    respiro = novo
-    respiro.acionar!
-    respiro.aguardar!
-    Respiro.executar(respiro) { :gravado }
-    assert_equal 0, respiro.seguidas
+    breather = novo
+    breather.acionar!
+    breather.aguardar!
+    Breather.executar(breather) { :gravado }
+    assert_equal 0, breather.seguidas
   end
 
   # --- erros e ruido ------------------------------------------------------
@@ -124,8 +124,8 @@ class BordasTest < Minitest::Test
   end
 
   def test_excecao_no_bloco_nao_deixa_pausa_presa
-    respiro = novo
-    assert_raises(RuntimeError) { Respiro.executar(respiro, idempotente: true) { raise "bug" } }
-    refute respiro.pausado?
+    breather = novo
+    assert_raises(RuntimeError) { Breather.executar(breather, idempotente: true) { raise "bug" } }
+    refute breather.pausado?
   end
 end

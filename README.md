@@ -1,17 +1,17 @@
-<p align="center"><img src="docs/banner.svg" alt="Respiro: freio global cooperativo para APIs que devolvem 503" width="100%"></p>
+<p align="center"><img src="docs/banner.svg" alt="Breather: freio global cooperativo para APIs que devolvem 503" width="100%"></p>
 
 <p align="center">
-  <a href="https://github.com/Dimasaas/respiro/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Dimasaas/respiro/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/Dimasaas/freio/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Dimasaas/freio/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="licença" src="https://img.shields.io/badge/licen%C3%A7a-PolyForm%20Noncommercial-7C4DFF">
   <img alt="Ruby" src="https://img.shields.io/badge/ruby-%E2%89%A5%203.2-CC342D?logo=ruby&logoColor=white">
   <img alt="dependências" src="https://img.shields.io/badge/depend%C3%AAncias-zero-00B8D4">
 </p>
 
-# Respiro
+# Breather
 
 > freio global cooperativo para APIs que devolvem 503
 
-O Respiro é um freio **global e cooperativo** para APIs que devolvem `503` em janelas. No primeiro 503, **todas** as threads que compartilham o mesmo freio pausam, com backoff exponencial, teto e jitter. Só a operação marcada como **idempotente** é refeita: escrita nunca é repetida. Ruby puro, sem dependências de runtime. Relógio e `sleep` são injetáveis, então os testes não esperam de verdade.
+O Breather é um freio **global e cooperativo** para APIs que devolvem `503` em janelas. No primeiro 503, **todas** as threads que compartilham o mesmo freio pausam, com backoff exponencial, teto e jitter. Só a operação marcada como **idempotente** é refeita: escrita nunca é repetida. Ruby puro, sem dependências de runtime. Relógio e `sleep` são injetáveis, então os testes não esperam de verdade.
 
 ## Por que existe
 
@@ -19,14 +19,14 @@ Um ERP corporativo atrás de IIS devolvia 503 em janelas de 25 a 30 segundos, e 
 
 O cliente tinha retentativa **por thread**: cada worker gastava suas 3 tentativas em poucos segundos e seguia para a consulta seguinte. Medido em uma rodada de lote: **~84 requisições por janela contra um servidor fora do ar**, com 4 workers e 7 rodadas, e dezenas de consultas empurradas para uma segunda passada. Pior: uma sonda de saúde, em outro processo, com uma única chamada, também levou 503. A janela era do servidor inteiro, e a nossa carga só piorava o estrago.
 
-O Respiro troca "cada thread se vira" por "uma decisão para todas": quem leva o primeiro 503 abre a pausa, quem vem depois espera, e cada janela recebe só o que já estava em voo mais uma sonda.
+O Breather troca "cada thread se vira" por "uma decisão para todas": quem leva o primeiro 503 abre a pausa, quem vem depois espera, e cada janela recebe só o que já estava em voo mais uma sonda.
 
 ```mermaid
 sequenceDiagram
     participant A as Thread A
     participant B as Thread B
     participant C as Thread C
-    participant F as Respiro (compartilhado)
+    participant F as Breather (compartilhado)
     participant S as API
 
     A->>F: aguardar!
@@ -54,35 +54,35 @@ sequenceDiagram
 ## Uso
 
 ```ruby
-require "respiro"
+require "breather"
 
 # Um freio por "servidor" a proteger, compartilhado entre as threads.
-RESPIRO = Respiro.new(base: 5, teto: 60, fator: 2, jitter: 0.2)
+BREATHER = Breather.new(base: 5, teto: 60, fator: 2, jitter: 0.2)
 
 # Leitura: idempotente, pode ser refeita depois da pausa.
-dados = Respiro.executar(RESPIRO, idempotente: true) do
+dados = Breather.executar(BREATHER, idempotente: true) do
   resposta = http.get("/consulta")
-  raise Respiro::Indisponivel.new("503", retry_after: resposta.retry_after) if resposta.status == 503
+  raise Breather::Indisponivel.new("503", retry_after: resposta.retry_after) if resposta.status == 503
   resposta.body
 end
 
 # Escrita: aciona o freio para as outras threads, mas NUNCA é repetida.
-Respiro.executar(RESPIRO, idempotente: false) do
+Breather.executar(BREATHER, idempotente: false) do
   resposta = http.post("/pedidos", corpo)
-  raise Respiro::Indisponivel if resposta.status == 503
+  raise Breather::Indisponivel if resposta.status == 503
   resposta
 end
 ```
 
 | Método | O que faz |
 |---|---|
-| `Respiro.new(base:, teto:, fator:, jitter:, relogio:, dormir:, sorteio:, fatia:, ao_acionar:)` | Cria o Respiro. Valida os parâmetros. |
+| `Breather.new(base:, teto:, fator:, jitter:, relogio:, dormir:, sorteio:, fatia:, ao_acionar:)` | Cria o Breather. Valida os parâmetros. |
 | `#aguardar!` | Bloqueia enquanto houver pausa. Devolve `true` se esperou. Chamar antes de **cada** requisição. |
 | `#acionar!(motivo, espera: nil)` | Abre a pausa global. Devolve a duração, ou `nil` se já havia pausa em curso. `espera` é um piso (ex.: `Retry-After`). |
 | `#sucesso!` | Zera o backoff (sem mexer numa pausa em curso). |
 | `#liberar!` | Encerra a pausa agora e zera o backoff. |
 | `#pausado?`, `#restante`, `#pausas`, `#seguidas` | Observação. |
-| `Respiro.executar(respiro, idempotente:, tentativas:) { ... }` | Aguarda, roda o bloco, traduz `Respiro::Indisponivel` em pausa e, se idempotente, refaz. Esgotou: `Respiro::TentativasEsgotadas`. |
+| `Breather.executar(breather, idempotente:, tentativas:) { ... }` | Aguarda, roda o bloco, traduz `Breather::Indisponivel` em pausa e, se idempotente, refaz. Esgotou: `Breather::TentativasEsgotadas`. |
 
 ### Exemplo executável
 
@@ -93,9 +93,9 @@ Janela de 503: 1.0 s
 
                                    requisições 503 levados   perdidas    tempo
 antes (retentativa por thread)             280         120         40    0.54s
-depois (Respiro compartilhado)             216          16          0    1.71s
+depois (Breather compartilhado)            216          16          0    1.71s
 
-Pausas abertas pelo Respiro: 2
+Pausas abertas pelo Breather: 2
 503 evitados: 87%
 ```
 
@@ -130,11 +130,11 @@ Código aberto para **ler e estudar**. Uso livre para estudo, pesquisa e projeto
 
 ## 🇺🇸 TL;DR
 
-A cooperative, process-wide brake for APIs that answer `503` in windows. On the first 503 **every** thread sharing the same `Respiro` pauses, using exponential backoff with a hard cap and jitter. Only operations flagged `idempotent: true` are retried; writes are never replayed (they still trip the brake so reads back off).
+A cooperative, process-wide brake for APIs that answer `503` in windows. On the first 503 **every** thread sharing the same `Breather` pauses, using exponential backoff with a hard cap and jitter. Only operations flagged `idempotent: true` are retried; writes are never replayed (they still trip the brake so reads back off).
 
 ```ruby
-respiro = Respiro.new(base: 5, teto: 60, fator: 2, jitter: 0.2)
-Respiro.executar(respiro, idempotente: true) { call_api_or_raise_Respiro_Indisponivel }
+breather = Breather.new(base: 5, teto: 60, fator: 2, jitter: 0.2)
+Breather.executar(breather, idempotente: true) { call_api_or_raise_Breather_Indisponivel }
 ```
 
 Why: a corporate ERP behind IIS returned 503 for ~25-30 s windows; per-thread retries burned ~84 requests per window against a server that was down. One shared decision replaces N independent ones. Clock, sleep and random source are injectable, so tests never wait. Zero runtime dependencies, Ruby >= 3.2. Licensed under PolyForm Noncommercial 1.0.0 (free for study and non-commercial use; commercial use requires the author's permission).

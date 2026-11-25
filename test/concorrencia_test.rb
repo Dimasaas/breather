@@ -45,7 +45,7 @@ class ServidorFalso
   def pedir
     t = @relogio.agora
     @mutex.synchronize { @log << t }
-    raise Respiro::Indisponivel, "503" if t < @fora_ate
+    raise Breather::Indisponivel, "503" if t < @fora_ate
 
     :ok
   end
@@ -58,7 +58,7 @@ class ConcorrenciaTest < Minitest::Test
 
   def setup
     @rel = RelogioManual.new
-    @respiro = Respiro.new(base: 5, teto: 60, fator: 2, jitter: 0,
+    @breather = Breather.new(base: 5, teto: 60, fator: 2, jitter: 0,
                        relogio: @rel.relogio, dormir: @rel.sono)
     @servidor = ServidorFalso.new(@rel, fora_ate: 5)
   end
@@ -70,13 +70,13 @@ class ConcorrenciaTest < Minitest::Test
   def lancar(n, idempotente: true, &bloco)
     bloco ||= -> { @servidor.pedir }
     @threads = Array.new(n) do
-      Thread.new { Respiro.executar(@respiro, idempotente: idempotente, &bloco) }
+      Thread.new { Breather.executar(@breather, idempotente: idempotente, &bloco) }
     end
   end
 
   # O ponto central: com a pausa aberta, NENHUMA thread dispara requisicao.
   def test_durante_a_janela_nenhuma_thread_dispara_requisicao
-    @respiro.acionar!("503 inicial")
+    @breather.acionar!("503 inicial")
     lancar(N)
 
     assert_equal N, @rel.esperar_dormindo(N), "todas as threads deveriam estar esperando"
@@ -112,18 +112,18 @@ class ConcorrenciaTest < Minitest::Test
     lancar(N, &bloco)
     @rel.esperar_dormindo(N)
 
-    assert_equal 1, @respiro.pausas
-    assert_equal 1, @respiro.seguidas
+    assert_equal 1, @breather.pausas
+    assert_equal 1, @breather.seguidas
     assert_equal N, @servidor.total, "só as N requisições que já estavam em voo"
 
     @rel.avancar_para(5.0)
     assert_equal [:ok] * N, @threads.map(&:value)
     assert_equal 2 * N, @servidor.total
-    assert_equal 0, @respiro.seguidas, "sucesso após a janela zera o backoff"
+    assert_equal 0, @breather.seguidas, "sucesso após a janela zera o backoff"
   end
 
   def test_thread_que_chega_no_meio_da_pausa_tambem_espera
-    @respiro.acionar!
+    @breather.acionar!
     primeira = lancar(1)
     @rel.esperar_dormindo(1)
     @threads += lancar(1)
@@ -134,48 +134,48 @@ class ConcorrenciaTest < Minitest::Test
   end
 
   def test_pausa_expirada_nao_segura_ninguem
-    @respiro.acionar!
+    @breather.acionar!
     @rel.avancar_para(5.0)
     lancar(N)
     assert_equal [:ok] * N, @threads.map(&:value)
   end
 
   def test_liberar_acorda_quem_espera
-    @respiro.acionar!
+    @breather.acionar!
     lancar(N)
     @rel.esperar_dormindo(N)
     @rel.avancar_para(5.0) # o servidor já voltou
-    @respiro.liberar!
+    @breather.liberar!
     assert_equal [:ok] * N, @threads.map(&:value)
   end
 
   def test_contadores_consistentes_sob_disputa
     100.times do
-      respiro = Respiro.new(base: 1, teto: 8, jitter: 0, relogio: @rel.relogio, dormir: @rel.sono)
+      breather = Breather.new(base: 1, teto: 8, jitter: 0, relogio: @rel.relogio, dormir: @rel.sono)
       aberturas = Queue.new
-      Array.new(8) { Thread.new { aberturas << respiro.acionar! } }.each(&:join)
+      Array.new(8) { Thread.new { aberturas << breather.acionar! } }.each(&:join)
       resultados = Array.new(aberturas.size) { aberturas.pop }
       assert_equal 1, resultados.compact.size, "só uma thread abre a pausa"
-      assert_equal 1, respiro.pausas
+      assert_equal 1, breather.pausas
     end
   end
 end
 
-# Com relogio e sono de verdade, em escala pequena: o respiro funciona de ponta a ponta.
+# Com relogio e sono de verdade, em escala pequena: o breather funciona de ponta a ponta.
 class ConcorrenciaRealTest < Minitest::Test
   def test_threads_reais_atravessam_a_janela
     inicio = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     fora_ate = inicio + 0.3
-    respiro = Respiro.new(base: 0.2, teto: 1, fator: 2, jitter: 0.1, fatia: 0.02)
+    breather = Breather.new(base: 0.2, teto: 1, fator: 2, jitter: 0.1, fatia: 0.02)
     mutex = Mutex.new
     recusadas = 0
 
     threads = Array.new(8) do
       Thread.new do
-        Respiro.executar(respiro, idempotente: true) do
+        Breather.executar(breather, idempotente: true) do
           if Process.clock_gettime(Process::CLOCK_MONOTONIC) < fora_ate
             mutex.synchronize { recusadas += 1 }
-            raise Respiro::Indisponivel
+            raise Breather::Indisponivel
           end
           :ok
         end
@@ -184,6 +184,6 @@ class ConcorrenciaRealTest < Minitest::Test
 
     assert_equal [:ok] * 8, threads.map(&:value)
     assert_operator recusadas, :<=, 16, "no máximo duas ondas de 503 (a em voo e uma de sonda)"
-    assert_operator respiro.pausas, :<=, 3
+    assert_operator breather.pausas, :<=, 3
   end
 end
