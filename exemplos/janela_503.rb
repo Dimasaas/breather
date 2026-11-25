@@ -5,7 +5,7 @@
 # estratégias com os mesmos workers:
 #
 #   ANTES  - cada thread tem a sua retentativa (3 tentativas seguidas, sem espera)
-#   DEPOIS - todas as threads compartilham um Freio
+#   DEPOIS - todas as threads compartilham um Respiro
 #
 # Rode:  ruby exemplos/janela_503.rb
 #
@@ -13,7 +13,7 @@
 # proporção é a mesma de uma janela de ~30 s com pausas de dezenas de segundos.
 
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
-require "freio"
+require "respiro"
 
 TRABALHADORES = 8
 CONSULTAS_POR_TRABALHADOR = 25
@@ -40,7 +40,7 @@ class ApiFalsa
       @recusadas += 1 if fora
     end
     sleep LATENCIA
-    raise Freio::Indisponivel, "503" if fora
+    raise Respiro::Indisponivel, "503" if fora
 
     :ok
   end
@@ -57,7 +57,7 @@ def rodar(rotulo)
       CONSULTAS_POR_TRABALHADOR.times do
         begin
           yield api
-        rescue Freio::Indisponivel
+        rescue Respiro::Indisponivel
           trava.synchronize { perdidas += 1 }
         end
       end
@@ -75,16 +75,16 @@ antes = rodar("antes (retentativa por thread)") do |api|
   begin
     tentativas += 1
     api.consultar
-  rescue Freio::Indisponivel
+  rescue Respiro::Indisponivel
     retry if tentativas < 3
     raise
   end
 end
 
-# DEPOIS: um freio compartilhado.
-freio = Freio.new(base: 0.4, teto: 2.0, fator: 2, jitter: 0.1, fatia: 0.05)
-depois = rodar("depois (freio compartilhado)") do |api|
-  Freio.executar(freio, idempotente: true, tentativas: 6) { api.consultar }
+# DEPOIS: um respiro compartilhado.
+respiro = Respiro.new(base: 0.4, teto: 2.0, fator: 2, jitter: 0.1, fatia: 0.05)
+depois = rodar("depois (Respiro compartilhado)") do |api|
+  Respiro.executar(respiro, idempotente: true, tentativas: 6) { api.consultar }
 end
 
 total = TRABALHADORES * CONSULTAS_POR_TRABALHADOR
@@ -95,5 +95,5 @@ puts format("%-34s %10s %10s %10s %8s", "", "requisições", "503 levados", "per
   puts format("%-34s %11d %11d %10d %7.2fs",
               r[:rotulo], r[:api].recebidas, r[:api].recusadas, r[:perdidas], r[:duracao])
 end
-puts "\nPausas abertas pelo freio: #{freio.pausas}"
+puts "\nPausas abertas pelo Respiro: #{respiro.pausas}"
 puts format("503 evitados: %.0f%%", 100.0 * (1 - depois[:api].recusadas.to_f / [antes[:api].recusadas, 1].max))

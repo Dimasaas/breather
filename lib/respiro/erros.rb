@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-class Freio
+class Respiro
   # Sinal de "servidor indisponivel" (por exemplo, HTTP 503).
   #
   # O codigo do chamador traduz a resposta da API para esta excecao dentro do
-  # bloco de Freio.executar. Se o servidor mandou Retry-After, ele vai em
+  # bloco de Respiro.executar. Se o servidor mandou Retry-After, ele vai em
   # +retry_after+ (segundos) e funciona como piso da pausa.
   class Indisponivel < StandardError
     attr_reader :retry_after

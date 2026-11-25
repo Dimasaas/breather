@@ -1,22 +1,22 @@
 # frozen_string_literal: true
 
-require_relative "freio/version"
-require_relative "freio/erros"
+require_relative "respiro/version"
+require_relative "respiro/erros"
 
-# Freio global cooperativo.
+# Respiro: freio global cooperativo.
 #
 # Varias threads compartilham UMA instancia. Quando qualquer uma delas leva um
 # 503, todas passam a esperar (em #aguardar!) ate o fim da pausa, em vez de cada
 # uma gastar suas proprias retentativas contra um servidor que esta fora.
 #
-#   freio = Freio.new(base: 5, teto: 60, fator: 2, jitter: 0.2)
+#   respiro = Respiro.new(base: 5, teto: 60, fator: 2, jitter: 0.2)
 #
-#   Freio.executar(freio, idempotente: true) do
+#   Respiro.executar(respiro, idempotente: true) do
 #     resposta = http.get("/consulta")
-#     raise Freio::Indisponivel if resposta.status == 503
+#     raise Respiro::Indisponivel if resposta.status == 503
 #     resposta
 #   end
-class Freio
+class Respiro
   RELOGIO = -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
   DORMIR  = ->(segundos) { Kernel.sleep(segundos) }
   SORTEIO = -> { Kernel.rand }
@@ -110,24 +110,24 @@ class Freio
     nil
   end
 
-  # Roda o bloco respeitando o freio.
+  # Roda o bloco respeitando o respiro.
   #
-  # idempotente: true  -> um Freio::Indisponivel aciona o freio e a operacao e
+  # idempotente: true  -> um Respiro::Indisponivel aciona o respiro e a operacao e
   #                       refeita (ate +tentativas+ no total).
-  # idempotente: false -> aciona o freio para as OUTRAS threads, mas relanca o
+  # idempotente: false -> aciona o respiro para as OUTRAS threads, mas relanca o
   #                       erro: uma escrita nunca e repetida sozinha.
-  def self.executar(freio, idempotente: false, tentativas: 4)
+  def self.executar(respiro, idempotente: false, tentativas: 4)
     raise ArgumentError, "tentativas deve ser >= 1" if tentativas < 1
 
     feitas = 0
     begin
-      freio.aguardar!
+      respiro.aguardar!
       feitas += 1
       resultado = yield
-      freio.sucesso!
+      respiro.sucesso!
       resultado
     rescue Indisponivel => e
-      freio.acionar!(e.message, espera: e.retry_after)
+      respiro.acionar!(e.message, espera: e.retry_after)
       raise unless idempotente
       raise TentativasEsgotadas.new(e.message, retry_after: e.retry_after) if feitas >= tentativas
 
